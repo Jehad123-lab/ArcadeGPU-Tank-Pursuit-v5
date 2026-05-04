@@ -29,7 +29,7 @@ export class Tank {
   currentUp: vec3 = [0, 1, 0];
   
   // Bullets instances
-  projectiles: { body: any, life: number, rot: Quaternion, type: 'normal' | 'grenade' }[] = [];
+  projectiles: { body: any, life: number, rot: Quaternion, type: 'normal' | 'grenade', lastVel: [number, number, number] }[] = [];
 
   static projMesh: Gfx3Mesh | null = null;
   static projGrenadeMesh: Gfx3Mesh | null = null;
@@ -51,7 +51,9 @@ export class Tank {
     this.antenna = createBoxMesh(0.05, 1.5, 0.05, [0.1, 0.1, 0.1]);
 
     if (!Tank.projMesh) {
-      Tank.projMesh = createBoxMesh(0.2, 0.2, 1.6, [1.0, 0.8, 0.0]);
+      // Shape it more like a bullet/shell: slightly thicker, not just a thin long box, maybe standard spherical or shorter box.
+      // E.g., 0.3 x 0.3 x 0.8
+      Tank.projMesh = createBoxMesh(0.3, 0.3, 0.8, [1.0, 0.6, 0.1]);
     }
     if (!Tank.projGrenadeMesh) {
       Tank.projGrenadeMesh = createBoxMesh(0.5, 0.5, 0.5, [0.2, 0.2, 0.2]);
@@ -259,6 +261,30 @@ export class Tank {
        if (p.life <= 0) {
           gfx3JoltManager.remove(p.body.bodyId);
           this.projectiles.splice(i, 1);
+       } else {
+          const curV = p.body.body.GetLinearVelocity();
+          p.lastVel = [curV.GetX(), curV.GetY(), curV.GetZ()];
+          
+          if (p.type === 'normal') {
+             // For normal bullets, make rotation match velocity
+             const velLen = Math.sqrt(p.lastVel[0]*p.lastVel[0] + p.lastVel[1]*p.lastVel[1] + p.lastVel[2]*p.lastVel[2]);
+             if (velLen > 0.1) {
+                 const dir = [-p.lastVel[0]/velLen, -p.lastVel[1]/velLen, -p.lastVel[2]/velLen]; // -Z is forward
+                 const up: vec3 = [0, 1, 0];
+                 const right = UT.VEC3_NORMALIZE(UT.VEC3_CROSS(up, dir));
+                 const newUp = UT.VEC3_CROSS(dir, right);
+                 
+                 // Create rotation matrix manually or just use lookAt
+                 // For now, let's keep it simple: normal bullets don't tumble.
+                 const yaw = Math.atan2(dir[0], dir[2]);
+                 const pitch = Math.asin(Math.max(-1, Math.min(1, dir[1])));
+                 
+                 // Apply yaw and pitch
+                 const qPitch = Quaternion.createFromAxisAngle([1, 0, 0], -pitch);
+                 const qYaw = Quaternion.createFromAxisAngle([0, 1, 0], yaw);
+                 p.rot = Quaternion.multiply(qYaw, qPitch);
+             }
+          }
        }
     }
     
@@ -279,14 +305,14 @@ export class Tank {
     ];
     
     const pBody = gfx3JoltManager.addBox({
-      width: 0.4, height: 0.4, depth: 0.4,
+      width: 0.3, height: 0.3, depth: type === 'grenade' ? 0.5 : 0.8,
       x: startPos[0], y: startPos[1], z: startPos[2],
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mMassPropertiesOverride: 0.01, mRestitution: 0.4 }
+      settings: { mMassPropertiesOverride: 0.01, mRestitution: 0.0 } // Set restitution to 0 to minimize bounce
     });
     
-    let forwardSpeed = 100;
+    let forwardSpeed = 150; // Increased normally bullet speed
     let upwardVelocity = 2; // slight arc for normal fire
     
     if (type === 'grenade') {
@@ -308,7 +334,7 @@ export class Tank {
     
     // Tank no longer receives hard physics recoil from shooting to avoid camera jump
     
-    this.projectiles.push({ body: pBody, life: 3.0, rot: q, type });
+    this.projectiles.push({ body: pBody, life: 3.0, rot: q, type, lastVel: [pVel.GetX(), pVel.GetY(), pVel.GetZ()] });
   }
 
   /**
@@ -329,8 +355,11 @@ export class Tank {
          const meshToDraw = p.type === 'grenade' ? Tank.projGrenadeMesh : Tank.projMesh;
          const scale: [number, number, number] = p.type === 'grenade' ? [1.5, 1.5, 1.5] : [1, 1, 1];
          const pPos = p.body.body.GetPosition();
-         const pRot = p.body.body.GetRotation();
-         const q = new Quaternion(pRot.GetW(), pRot.GetX(), pRot.GetY(), pRot.GetZ());
+         let q = p.rot;
+         if (p.type === 'grenade') {
+             const pRot = p.body.body.GetRotation();
+             q = new Quaternion(pRot.GetW(), pRot.GetX(), pRot.GetY(), pRot.GetZ());
+         }
          
          const ZERO: [number, number, number] = [0,0,0];
          const matProj = UT.MAT4_TRANSFORM([pPos.GetX(), pPos.GetY(), pPos.GetZ()], ZERO, scale, q);

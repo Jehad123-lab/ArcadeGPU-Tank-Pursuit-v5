@@ -216,8 +216,17 @@ export class GameScreen extends Screen {
             this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [0.4, 0.4, 0.4], undefined, 1.5, 'trail'));
         }
         
+        const curV = p.body.body.GetLinearVelocity();
+        const velSq = curV.GetX()*curV.GetX() + curV.GetY()*curV.GetY() + curV.GetZ()*curV.GetZ();
+        
+        // Detect impact: if it hits the ground OR its speed suddenly drops (bounces off a wall)
+        // A normal bullet is fast (>100), if it hits something its speed drops
         let hitGround = false;
-        if (pPos.GetY() < 0.2) {
+        
+        // If projectile is "normal" and its velocity drops significantly, or if y < 0.2
+        const isImpact = pPos.GetY() < 0.2 || (p.type === 'normal' && velSq < 5000); // 150^2 = 22500, so < 5000 means it lost huge speed
+
+        if (isImpact) {
             p.life = 0;
             if (p.type === 'grenade') {
                 this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [0.8, 0.4, 0.1], undefined, 3.0, 'grenade'));
@@ -242,7 +251,7 @@ export class GameScreen extends Screen {
                     }
                 }
             } else {
-                this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ()));
+                this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [1.0, 0.7, 0.2], undefined, 1.0));
             }
             hitGround = true;
         }
