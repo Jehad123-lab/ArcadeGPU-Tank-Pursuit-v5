@@ -18,9 +18,8 @@ import { eventManager } from '@lib/core/event_manager';
 import { Gfx3Drawable, Gfx3MeshEffect } from '@lib/gfx3/gfx3_drawable';
 import { inputManager } from '@lib/input/input_manager';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Bomb, LogIn, LogOut } from 'lucide-react';
+import { Target, Bomb } from 'lucide-react';
 import { Tank } from './game/Tank';
-import { Player } from './game/Player';
 import { Environment } from './game/Environment';
 import { Enemy } from './game/Enemy';
 import { Explosion } from './game/Explosion';
@@ -97,8 +96,6 @@ const Joystick = ({ onChange }: { onChange: (dir: { x: number, y: number }) => v
 const App = () => {
     const [isReady, setIsReady] = useState(false);
     const gameScreenRef = useRef<GameScreen | null>(null);
-    const [nearTank, setNearTank] = useState(false);
-    const [inTank, setInTank] = useState(false);
 
     useEffect(() => {
         const handleContextMenu = (e: MouseEvent) => {
@@ -126,20 +123,8 @@ const App = () => {
 
         init();
 
-        const interval = setInterval(() => {
-            const screen = gameScreenRef.current;
-            if (screen) {
-                const tankPos = screen.tank.body.getPosition();
-                const playerPos = screen.player.position;
-                const dist = UT.VEC3_DISTANCE(tankPos, playerPos);
-                setNearTank(!screen.isPlayerInTank && dist < 6.0);
-                setInTank(screen.isPlayerInTank);
-            }
-        }, 100);
-
         return () => {
             document.removeEventListener('contextmenu', handleContextMenu);
-            clearInterval(interval);
             em.pause();
         };
     }, []);
@@ -186,15 +171,6 @@ const App = () => {
         } catch (err) {}
     };
 
-    const handleInteract = (e: React.PointerEvent | React.MouseEvent | React.TouchEvent) => {
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
-        if ((e as any).nativeEvent && (e as any).nativeEvent.stopImmediatePropagation) {
-            (e as any).nativeEvent.stopImmediatePropagation();
-        }
-        if (gameScreenRef.current) gameScreenRef.current.virtualInteract = true;
-    };
-
     return (
         <div className="fixed inset-0 w-full h-full pointer-events-none flex flex-col justify-end p-8 overflow-hidden font-sans">
             <AnimatePresence>
@@ -215,11 +191,10 @@ const App = () => {
                 <h1 className="text-4xl font-bebas text-white drop-shadow-lg tracking-wider">TANK COMMAND</h1>
                 <div className="bg-black/20 backdrop-blur-sm p-3 rounded-lg border border-white/5 mt-2">
                     <p className="text-white/80 text-xs font-bold uppercase tracking-tighter mb-1">Controls</p>
-                    <p className="text-white/60 text-[11px] font-mono leading-tight">WASD + SHIFT • WALK / RUN</p>
+                    <p className="text-white/60 text-[11px] font-mono leading-tight">WASD • MOVE TANK</p>
                     <p className="text-white/60 text-[11px] font-mono leading-tight">MOUSE • LOOK AROUND</p>
-                    <p className="text-white/60 text-[11px] font-mono leading-tight">SPACE • JUMP / FIRE</p>
+                    <p className="text-white/60 text-[11px] font-mono leading-tight">SPACE • FIRE</p>
                     <p className="text-white/60 text-[11px] font-mono leading-tight">L CLICK • FIRE | R CLICK • GRENADE</p>
-                    <p className="text-white/60 text-[11px] font-mono leading-tight">E • ENTER / EXIT TANK</p>
                 </div>
             </div>
             
@@ -227,40 +202,10 @@ const App = () => {
                <div className="w-1 h-1 bg-white rounded-full opacity-50 mix-blend-difference"></div>
             </div>
 
-            {nearTank && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-16 pointer-events-none">
-                    <div className="bg-black/50 text-white font-mono px-4 py-2 rounded-lg border border-white/20 backdrop-blur">
-                        Press <span className="text-yellow-400 font-bold">E</span> to enter tank
-                    </div>
-                </div>
-            )}
-            
-            {inTank && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-16 pointer-events-none">
-                    <div className="bg-black/50 text-white font-mono px-4 py-2 rounded-lg border border-white/20 backdrop-blur">
-                        Press <span className="text-yellow-400 font-bold">E</span> to exit tank
-                    </div>
-                </div>
-            )}
-
             <div className="pointer-events-auto flex justify-between items-end w-full pb-8">
                 <Joystick onChange={handleJoystickChange} />
                 
                 <div className="flex flex-col items-end gap-2">
-                    {nearTank && !inTank && (
-                        <button 
-                            onPointerDown={handleInteract}
-                            className="w-16 h-16 rounded-full bg-blue-500 shadow-lg border-b-4 border-blue-700 active:translate-y-1 active:border-b-0 transition-all flex items-center justify-center text-white font-bold mb-2 z-50 pointer-events-auto select-none touch-none">
-                            <LogIn size={28} />
-                        </button>
-                    )}
-                    {inTank && (
-                        <button 
-                            onPointerDown={handleInteract}
-                            className="w-16 h-16 rounded-full bg-yellow-500 shadow-lg border-b-4 border-yellow-700 active:translate-y-1 active:border-b-0 transition-all flex items-center justify-center text-black font-bold mb-2 z-50 pointer-events-auto select-none touch-none">
-                            <LogOut size={28} />
-                        </button>
-                    )}
                     <div className="flex gap-4 items-end">
                         <motion.button 
                             whileTap={{ scale: 0.85 }}

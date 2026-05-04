@@ -20,7 +20,6 @@ import { inputManager } from '@lib/input/input_manager';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, Bomb, LogIn, LogOut } from 'lucide-react';
 import { Tank } from './Tank';
-import { Player } from './Player';
 import { Environment } from './Environment';
 import { Enemy } from './Enemy';
 import { Explosion } from './Explosion';
@@ -29,16 +28,13 @@ import { createBoxMesh } from './GameUtils';
 export class GameScreen extends Screen {
   camera: Gfx3Camera;
   tank: Tank;
-  player: Player;
   level: Environment;
   enemies: Enemy[] = [];
   explosions: Explosion[] = [];
   moveDir = { x: 0, y: 0 };
   virtualFire: 'none' | 'normal' | 'grenade' = 'none';
   wasFiring = false;
-  virtualInteract = false;
   
-  isPlayerInTank: boolean = true;
   cameraYaw = Math.PI; 
   cameraPitch = 0.2;
   cameraDistance = 8;
@@ -50,7 +46,6 @@ export class GameScreen extends Screen {
     super();
     this.camera = new Gfx3Camera(0);
     this.tank = new Tank();
-    this.player = new Player();
     this.level = new Environment();
     
     // Spawn some enemies
@@ -87,7 +82,6 @@ export class GameScreen extends Screen {
     // Load Models
     await Promise.all([
       this.tank.load(),
-      this.player.load(),
       Enemy.initMeshes()
     ]);
     
@@ -98,12 +92,9 @@ export class GameScreen extends Screen {
     inputManager.registerAction('keyboard', 'KeyD', 'STR_RGT');
     inputManager.registerAction('keyboard', 'KeyQ', 'CAM_L');
     inputManager.registerAction('keyboard', 'KeyC', 'CAM_R');
-    inputManager.registerAction('keyboard', 'KeyE', 'INTERACT');
     inputManager.registerAction('keyboard', 'KeyR', 'CAM_Z_IN');
     inputManager.registerAction('keyboard', 'KeyF', 'CAM_Z_OUT');
     inputManager.registerAction('keyboard', 'Space', 'FIRE');
-    inputManager.registerAction('keyboard', 'Space', 'JUMP');
-    inputManager.registerAction('keyboard', 'ShiftLeft', 'RUN');
 
     inputManager.setPointerLockEnabled(true);
     eventManager.subscribe(inputManager, 'E_MOUSE_MOVE', this, this.handleMouseMove);
@@ -112,13 +103,8 @@ export class GameScreen extends Screen {
     this.camera.lookAt(0, 0, 0);
     this.camera.getView().setBgColor(0.53, 0.81, 0.92, 1.0); // Sky blue
     
-    // Default start inside tank
-    if (this.isPlayerInTank) {
-      gfx3JoltManager.bodyInterface.SetLinearVelocity(this.player.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
-      gfx3JoltManager.bodyInterface.SetPosition(this.player.physicsBody.body.GetID(), VEC3_TO_JOLT_RVEC3([0, -100, 0]), Gfx3Jolt.EActivation_DontActivate);
-      const tankPos = this.tank.body.getPosition();
-      this.cameraLookTarget = [tankPos[0], tankPos[1] + 1.5, tankPos[2]];
-    }
+    const tankPos = this.tank.body.getPosition();
+    this.cameraLookTarget = [tankPos[0], tankPos[1] + 1.5, tankPos[2]];
     this.isReady = true;
   }
 
@@ -141,40 +127,12 @@ export class GameScreen extends Screen {
     if (inputManager.isActiveAction('CAM_Z_IN')) this.cameraDistance = Math.max(5, this.cameraDistance - 0.5);
     if (inputManager.isActiveAction('CAM_Z_OUT')) this.cameraDistance = Math.min(40, this.cameraDistance + 0.5);
 
-    // Toggle Tank Entry
-    if (inputManager.isJustActiveAction('INTERACT') || this.virtualInteract) {
-       this.virtualInteract = false;
-       const tankPos = JOLT_RVEC3_TO_VEC3(this.tank.physicsBody.body.GetPosition());
-       const playerPos = this.player.position;
-       const dist = UT.VEC3_DISTANCE(tankPos, playerPos);
-       
-       // Allow exit if already in tank, or enter if near the tank
-       if (this.isPlayerInTank || dist < 6.0) {
-          this.isPlayerInTank = !this.isPlayerInTank;
-          
-          if (this.isPlayerInTank) {
-            // Hide player and move physics body away
-            gfx3JoltManager.bodyInterface.SetLinearVelocity(this.player.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
-            gfx3JoltManager.bodyInterface.SetPosition(this.player.physicsBody.body.GetID(), VEC3_TO_JOLT_RVEC3([0, -100, 0]), Gfx3Jolt.EActivation_DontActivate);
-          } else {
-            // Exit tank: place player next to tank
-             const rot = this.tank.rotation;
-             const exitX = tankPos[0] + Math.cos(rot + Math.PI/2) * 6;
-             const exitZ = tankPos[2] - Math.sin(rot + Math.PI/2) * 6;
-             gfx3JoltManager.bodyInterface.SetLinearVelocity(this.player.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
-             gfx3JoltManager.bodyInterface.SetPosition(this.player.physicsBody.body.GetID(), VEC3_TO_JOLT_RVEC3([exitX, tankPos[1] + 2, exitZ]), Gfx3Jolt.EActivation_Activate);
-             this.player.position = [exitX, tankPos[1] + 2, exitZ];
-          }
-       }
-    }
-
     let kbX = 0;
     let kbY = 0;
     if (inputManager.isActiveAction('THR_FWD')) kbY += 1;
     if (inputManager.isActiveAction('THR_BWD')) kbY -= 1;
     if (inputManager.isActiveAction('STR_LFT')) kbX -= 1;
     if (inputManager.isActiveAction('STR_RGT')) kbX += 1;
-    if (inputManager.isActiveAction('JUMP')) this.player.jump();
 
     const combinedMoveDir = { 
       x: kbX + (Math.abs(this.moveDir.x) > 0.1 ? this.moveDir.x : 0),
@@ -192,7 +150,7 @@ export class GameScreen extends Screen {
 
     this.level.update(ts);
 
-    const targetPos = this.isPlayerInTank ? this.tank.body.getPosition() : this.player.position;
+    const targetPos = this.tank.body.getPosition();
     for (const enemy of this.enemies) {
        const res = enemy.update(ts, targetPos);
        if (res.didShoot && res.muzzlePos && res.dir) {
@@ -297,25 +255,20 @@ export class GameScreen extends Screen {
             if (p.life <= 0) continue;
             const pPos = p.body.body.GetPosition();
             
-            const pTarget = this.isPlayerInTank ? this.tank.body.getPosition() : this.player.position;
+            const pTarget = this.tank.body.getPosition();
             const dx = pPos.GetX() - pTarget[0];
             const dy = pPos.GetY() - pTarget[1];
             const dz = pPos.GetZ() - pTarget[2];
             const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
             
-            if (dist < (this.isPlayerInTank ? 2.5 : 1.0)) {
+            if (dist < 2.5) {
                 p.life = 0;
                 this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ()));
                 
-                // Add a push to the player/tank
+                // Add a push to the tank
                 const pushDir = p.rot.rotateVector([0, 0, -1]);
-                if (this.isPlayerInTank) {
-                    const pushForce = new Gfx3Jolt.Vec3(pushDir[0] * 800, 200, pushDir[2] * 800);
-                    gfx3JoltManager.bodyInterface.AddImpulse(this.tank.physicsBody.body.GetID(), pushForce);
-                } else {
-                    const pushForce = new Gfx3Jolt.Vec3(pushDir[0] * 400, 200, pushDir[2] * 400);
-                    gfx3JoltManager.bodyInterface.AddImpulse(this.player.physicsBody.body.GetID(), pushForce);
-                }
+                const pushForce = new Gfx3Jolt.Vec3(pushDir[0] * 800, 200, pushDir[2] * 800);
+                gfx3JoltManager.bodyInterface.AddImpulse(this.tank.physicsBody.body.GetID(), pushForce);
                 
                 // Add camera shake or player damage logic here
             }
@@ -323,44 +276,25 @@ export class GameScreen extends Screen {
     }
 
     // Update based on possessed entity
-    if (this.isPlayerInTank) {
-      const didShoot = this.tank.update(ts, combinedMoveDir, isFiring, this.cameraYaw);
-      if (didShoot) {
-         const bPos = this.tank.barrel.getPosition();
-         const bRot = this.tank.barrel.getQuaternion();
-         const dir = bRot.rotateVector([0, 0, -1]);
-         
-         const muzzlePos = [
-             bPos[0] + dir[0] * 3.0,
-             bPos[1] + dir[1] * 3.0,
-             bPos[2] + dir[2] * 3.0,
-         ] as vec3;
-         
-         const muzzleColor: [number, number, number] = didShoot === 'grenade' ? [0.8, 0.4, 0.1] : [1.0, 0.8, 0.2];
-         const scaleMultiplier = didShoot === 'grenade' ? 2.5 : 1.0; // Increased scale for grenade muzzle
-         this.explosions.push(new Explosion(muzzlePos[0], muzzlePos[1], muzzlePos[2], muzzleColor, dir, scaleMultiplier, 'muzzle'));
-      }
-      
-      // Stop player
-      this.player.update(ts, { x: 0, y: 0 });
-    } else {
-      this.tank.update(ts, { x: 0, y: 0 }, 'none', this.tank.rotation);
-      
-      // Calculate local movement direction relative to camera yaw
-      // Forward is aligning with the camera's look direction (ignoring Y).
-      const camRad = this.cameraYaw;
-      const cosC = Math.cos(camRad);
-      const sinC = Math.sin(camRad);
-      
-      const worldDirX = combinedMoveDir.x * cosC - combinedMoveDir.y * sinC;
-      const worldDirZ = -combinedMoveDir.x * sinC - combinedMoveDir.y * cosC;
-      
-      const isRunning = inputManager.isActiveAction('RUN');
-      this.player.update(ts, { x: worldDirX, y: worldDirZ }, isRunning);
+    const didShoot = this.tank.update(ts, combinedMoveDir, isFiring, this.cameraYaw);
+    if (didShoot) {
+       const bPos = this.tank.barrel.getPosition();
+       const bRot = this.tank.barrel.getQuaternion();
+       const dir = bRot.rotateVector([0, 0, -1]);
+       
+       const muzzlePos = [
+           bPos[0] + dir[0] * 3.0,
+           bPos[1] + dir[1] * 3.0,
+           bPos[2] + dir[2] * 3.0,
+       ] as vec3;
+       
+       const muzzleColor: [number, number, number] = didShoot === 'grenade' ? [0.8, 0.4, 0.1] : [1.0, 0.8, 0.2];
+       const scaleMultiplier = didShoot === 'grenade' ? 2.5 : 1.0; // Increased scale for grenade muzzle
+       this.explosions.push(new Explosion(muzzlePos[0], muzzlePos[1], muzzlePos[2], muzzleColor, dir, scaleMultiplier, 'muzzle'));
     }
 
     // Camera Follow
-    const followPos = this.isPlayerInTank ? this.tank.body.getPosition() : this.player.position;
+    const followPos = this.tank.body.getPosition();
     
     // Convert spherical to cartesian coords for the camera offset
     // Camera is pos relative to target
@@ -374,7 +308,7 @@ export class GameScreen extends Screen {
         Math.cos(cy) * Math.cos(cp) * this.cameraDistance
     ];
     
-    const targetHeightOffset = this.isPlayerInTank ? 1.5 : 1.0;
+    const targetHeightOffset = 1.5;
     
     // Safety check for followPos to prevent NaN camera
     if (!followPos || isNaN(followPos[0]) || isNaN(followPos[1]) || isNaN(followPos[2])) {
@@ -400,7 +334,7 @@ export class GameScreen extends Screen {
     // Final NaN check before setting
     if (!isNaN(lerpedPos[0]) && !isNaN(lerpedPos[1]) && !isNaN(lerpedPos[2])) {
         let shakeX = 0, shakeY = 0, shakeZ = 0;
-        if (this.isPlayerInTank && this.tank.recoil > 0) {
+        if (this.tank.recoil > 0) {
             const mag = this.tank.recoil * 0.4;
             shakeX = (Math.random() - 0.5) * mag;
             shakeY = (Math.random() - 0.5) * mag;
@@ -425,9 +359,6 @@ export class GameScreen extends Screen {
     }
     for (const exp of this.explosions) {
        exp.draw();
-    }
-    if (!this.isPlayerInTank) {
-       this.player.draw();
     }
     
     gfx3Manager.endDrawing();
