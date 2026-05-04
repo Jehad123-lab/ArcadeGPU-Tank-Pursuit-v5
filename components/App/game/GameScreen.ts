@@ -177,12 +177,52 @@ export class GameScreen extends Screen {
         const curV = p.body.body.GetLinearVelocity();
         const velSq = curV.GetX()*curV.GetX() + curV.GetY()*curV.GetY() + curV.GetZ()*curV.GetZ();
         
-        // Detect impact: if it hits the ground OR its speed suddenly drops (bounces off a wall)
-        // A normal bullet is fast (>100), if it hits something its speed drops
-        let hitGround = false;
+        let hitEnemy = false;
         
-        // If projectile is "normal" and its velocity drops significantly, or if y < 0.2
-        const isImpact = pPos.GetY() < 0.2 || (p.type === 'normal' && velSq < 5000); // 150^2 = 22500, so < 5000 means it lost huge speed
+        for (const enemy of this.enemies) {
+            if (enemy.hp <= 0) continue;
+            const ePos = enemy.physicsBody.body.GetPosition();
+            const dx = pPos.GetX() - ePos.GetX();
+            const dy = pPos.GetY() - ePos.GetY();
+            const dz = pPos.GetZ() - ePos.GetZ();
+            const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+            if (dist < 3.5) {
+                hitEnemy = true;
+                if (p.type === 'grenade') {
+                    enemy.hp -= 100; // instant kill
+                    p.life = 0; 
+                    this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [0.8, 0.4, 0.1], undefined, 3.0, 'grenade'));
+                } else {
+                    enemy.hp -= 34; // 3 hits to kill (100 hp)
+                    p.life = 0; 
+                    this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [1.0, 0.7, 0.2], undefined, 1.0));
+                }
+                
+                // Add a consistent visual hop and push
+                const pushDir = p.rot.rotateVector([0, 0, -1]);
+                const pushMagnitude = p.type === 'grenade' ? 1200 : 600;
+                const pushForce = new Gfx3Jolt.Vec3(pushDir[0] * pushMagnitude, p.type === 'grenade' ? 1000 : 500, pushDir[2] * pushMagnitude);
+                gfx3JoltManager.bodyInterface.AddImpulse(enemy.physicsBody.body.GetID(), pushForce);
+
+                if (enemy.hp <= 0) {
+                    this.explosions.push(new Explosion(ePos.GetX(), ePos.GetY(), ePos.GetZ(), [0.8, 0.2, 0.2], undefined, p.type === 'grenade' ? 2.5 : 1.5));
+                    gfx3JoltManager.bodyInterface.SetPosition(enemy.physicsBody.body.GetID(), VEC3_TO_JOLT_RVEC3([0, -100, 0]), Gfx3Jolt.EActivation_DontActivate);
+                }
+                break;
+            }
+        }
+        
+        if (hitEnemy) continue;
+
+        // Detect impact: if it hits the ground OR its speed changes abruptly (hits a wall)
+        const dvX = curV.GetX() - p.lastVel[0];
+        const dvY = curV.GetY() - p.lastVel[1];
+        const dvZ = curV.GetZ() - p.lastVel[2];
+        const deltaVelSq = dvX*dvX + dvY*dvY + dvZ*dvZ;
+        
+        // A normal bullet is fast (>100). Gravity only changes Y vel a tiny bit per frame.
+        // If deltaVelSq > 1000, it hit a physical obstacle.
+        const isImpact = pPos.GetY() < 0.2 || deltaVelSq > 1000; 
 
         if (isImpact) {
             p.life = 0;
@@ -211,41 +251,6 @@ export class GameScreen extends Screen {
             } else {
                 this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [1.0, 0.7, 0.2], undefined, 1.0));
             }
-            hitGround = true;
-        }
-
-        if (hitGround) continue;
-
-        for (const enemy of this.enemies) {
-            if (enemy.hp <= 0) continue;
-            const ePos = enemy.physicsBody.body.GetPosition();
-            const dx = pPos.GetX() - ePos.GetX();
-            const dy = pPos.GetY() - ePos.GetY();
-            const dz = pPos.GetZ() - ePos.GetZ();
-            const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-            if (dist < 2.5) {
-                if (p.type === 'grenade') {
-                    enemy.hp -= 100; // instant kill
-                    p.life = 0; 
-                    this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [0.8, 0.4, 0.1], undefined, 3.0, 'grenade'));
-                } else {
-                    enemy.hp -= 34; // 3 hits to kill (100 hp)
-                    p.life = 0; 
-                    this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ()));
-                }
-                
-                // Add a consistent visual hop and push
-                const pushDir = p.rot.rotateVector([0, 0, -1]);
-                const pushMagnitude = p.type === 'grenade' ? 1200 : 600;
-                const pushForce = new Gfx3Jolt.Vec3(pushDir[0] * pushMagnitude, p.type === 'grenade' ? 1000 : 500, pushDir[2] * pushMagnitude);
-                gfx3JoltManager.bodyInterface.AddImpulse(enemy.physicsBody.body.GetID(), pushForce);
-
-                if (enemy.hp <= 0) {
-                    this.explosions.push(new Explosion(ePos.GetX(), ePos.GetY(), ePos.GetZ(), [0.8, 0.2, 0.2], undefined, p.type === 'grenade' ? 2.5 : 1.5));
-                    gfx3JoltManager.bodyInterface.SetPosition(enemy.physicsBody.body.GetID(), VEC3_TO_JOLT_RVEC3([0, -100, 0]), Gfx3Jolt.EActivation_DontActivate);
-                }
-                break;
-            }
         }
     }
     
@@ -271,6 +276,9 @@ export class GameScreen extends Screen {
                 gfx3JoltManager.bodyInterface.AddImpulse(this.tank.physicsBody.body.GetID(), pushForce);
                 
                 // Add camera shake or player damage logic here
+            } else if (pPos.GetY() < 0.2) {
+                p.life = 0;
+                this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ()));
             }
         }
     }
