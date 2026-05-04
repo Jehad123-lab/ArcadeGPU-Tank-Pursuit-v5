@@ -179,6 +179,38 @@ export class GameScreen extends Screen {
         
         let hitEnemy = false;
         
+        // Homing logic for player's grenade
+        if (p.type === 'grenade') {
+            let closestEnemy: any = null;
+            let closestDist = 20; // Homing range
+            for (const enemy of this.enemies) {
+                if (enemy.hp <= 0) continue;
+                const ePos = enemy.physicsBody.body.GetPosition();
+                const dx = ePos.GetX() - pPos.GetX();
+                const dy = ePos.GetY() - pPos.GetY();
+                const dz = ePos.GetZ() - pPos.GetZ();
+                const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                if (d < closestDist) {
+                    closestDist = d;
+                    closestEnemy = enemy;
+                }
+            }
+            if (closestEnemy) {
+                const ePos = closestEnemy.physicsBody.body.GetPosition();
+                const dirX = ePos.GetX() - pPos.GetX();
+                const dirY = (ePos.GetY() + 1.0) - pPos.GetY(); // Aim slightly up
+                const dirZ = ePos.GetZ() - pPos.GetZ();
+                const len = Math.sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ);
+                if (len > 0.1) {
+                    const speedMultiplier = 150.0 * (ts / 1000); // adjust steering strength
+                    const homingForce = new Gfx3Jolt.Vec3((dirX / len) * speedMultiplier, (dirY / len) * speedMultiplier, (dirZ / len) * speedMultiplier);
+                    const currentV = p.body.body.GetLinearVelocity();
+                    const newV = new Gfx3Jolt.Vec3(currentV.GetX() + homingForce.GetX(), currentV.GetY() + homingForce.GetY(), currentV.GetZ() + homingForce.GetZ());
+                    gfx3JoltManager.bodyInterface.SetLinearVelocity(p.body.bodyId, newV);
+                }
+            }
+        }
+
         for (const enemy of this.enemies) {
             if (enemy.hp <= 0) continue;
             const ePos = enemy.physicsBody.body.GetPosition();
@@ -186,7 +218,10 @@ export class GameScreen extends Screen {
             const dy = pPos.GetY() - ePos.GetY();
             const dz = pPos.GetZ() - ePos.GetZ();
             const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-            if (dist < 2.2) {
+            
+            const hitThreshold = p.type === 'grenade' ? 2.5 : 1.2;
+            
+            if (dist < hitThreshold) {
                 hitEnemy = true;
                 if (p.type === 'grenade') {
                     enemy.hp -= 100; // instant kill

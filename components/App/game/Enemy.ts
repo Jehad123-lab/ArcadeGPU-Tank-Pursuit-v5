@@ -117,7 +117,7 @@ export class Enemy {
     if (angleDiff > Math.PI) angleDiff -= PI2;
     if (angleDiff < -Math.PI) angleDiff += PI2;
     
-    const rotSpeed = 2.0;    
+    const rotSpeed = 0.5;    
     this.rotation += Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), rotSpeed * (ts / 1000));
     
     // Simple Chase - Stop when close
