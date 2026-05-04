@@ -212,8 +212,8 @@ export class GameScreen extends Screen {
         const pPos = p.body.body.GetPosition();
         
         // Trail
-        if (p.type === 'grenade' && Math.random() < 0.6) {
-            this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [0.4, 0.4, 0.4], undefined, 2.0, 'trail'));
+        if (p.type === 'grenade' && Math.random() < 0.2) {
+            this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ(), [0.4, 0.4, 0.4], undefined, 1.5, 'trail'));
         }
         
         let hitGround = false;

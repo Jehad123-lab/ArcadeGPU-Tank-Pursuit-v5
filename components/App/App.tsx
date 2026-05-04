@@ -262,22 +262,33 @@ const App = () => {
                         </button>
                     )}
                     <div className="flex gap-4 items-end">
-                        <button 
+                        <motion.button 
+                            whileTap={{ scale: 0.85 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                             onPointerDown={(e) => handleFireDown(e, 'grenade')}
                             onPointerUp={(e) => handleFireUp(e, 'grenade')}
                             onPointerLeave={(e) => handleFireUp(e, 'grenade')}
+                            onPointerMove={(e) => { e.stopPropagation(); if (e.nativeEvent?.stopImmediatePropagation) e.nativeEvent.stopImmediatePropagation(); }}
                             onContextMenu={(e) => e.preventDefault()}
-                            className="w-16 h-16 rounded-full bg-orange-500 shadow-[0_4px_10px_rgba(249,115,22,0.4)] border-b-[6px] border-orange-700 active:translate-y-1.5 active:border-b-0 transition-all flex items-center justify-center text-white bg-gradient-to-tr from-orange-700 to-orange-400 z-50 pointer-events-auto select-none touch-none shrink-0 mb-4">
+                            className="w-16 h-16 rounded-full bg-orange-500 shadow-[0_4px_15px_rgba(249,115,22,0.6)] border-[4px] border-orange-700/50 flex items-center justify-center text-white bg-gradient-to-tr from-orange-700 to-orange-400 z-50 pointer-events-auto select-none touch-none shrink-0 mb-4 relative"
+                        >
                             <Bomb size={28} />
-                        </button>
-                        <button 
+                            {/* Make tap area slightly larger */}
+                            <div className="absolute -inset-4 rounded-full pointer-events-auto z-10" />
+                        </motion.button>
+                        <motion.button 
+                            whileTap={{ scale: 0.85 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                             onPointerDown={(e) => handleFireDown(e, 'normal')}
                             onPointerUp={(e) => handleFireUp(e, 'normal')}
                             onPointerLeave={(e) => handleFireUp(e, 'normal')}
+                            onPointerMove={(e) => { e.stopPropagation(); if (e.nativeEvent?.stopImmediatePropagation) e.nativeEvent.stopImmediatePropagation(); }}
                             onContextMenu={(e) => e.preventDefault()}
-                            className="w-24 h-24 rounded-[30px] bg-red-600 shadow-[0_8px_20px_rgba(220,38,38,0.5)] border-b-[8px] border-red-800 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center text-white bg-gradient-to-tr from-red-800 to-red-500 z-50 pointer-events-auto select-none touch-none shrink-0">
+                            className="w-24 h-24 rounded-[30px] bg-red-600 shadow-[0_8px_25px_rgba(220,38,38,0.6)] border-[6px] border-red-800/50 flex items-center justify-center text-white bg-gradient-to-tr from-red-800 to-red-500 z-50 pointer-events-auto select-none touch-none shrink-0 relative"
+                        >
                             <Target size={40} className="drop-shadow-lg" />
-                        </button>
+                            <div className="absolute -inset-4 rounded-[40px] pointer-events-auto z-10" />
+                        </motion.button>
                     </div>
                     <div className="text-white/40 text-xs font-mono uppercase mt-4">Version 0.2.1-Alpha</div>
                 </div>

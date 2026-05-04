@@ -302,7 +302,7 @@ export class Tank {
     gfx3JoltManager.bodyInterface.SetLinearVelocity(pBody.body.GetID(), pVel);
 
     if (type === 'grenade') {
-        const angVel = new Gfx3Jolt.Vec3(Math.random() * 10, Math.random() * 10, Math.random() * 10);
+        const angVel = new Gfx3Jolt.Vec3((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20);
         gfx3JoltManager.bodyInterface.SetAngularVelocity(pBody.body.GetID(), angVel);
     }
     
