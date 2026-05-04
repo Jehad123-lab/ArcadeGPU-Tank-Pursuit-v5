@@ -35,7 +35,7 @@ export class GameScreen extends Screen {
   virtualFire: 'none' | 'normal' | 'grenade' = 'none';
   wasFiring = false;
   
-  cameraYaw = Math.PI; 
+  cameraYaw = 0; 
   cameraPitch = 0.2;
   cameraDistance = 8;
   isReady: boolean = false;
@@ -53,7 +53,7 @@ export class GameScreen extends Screen {
        const x = (Math.random() - 0.5) * 200;
        const z = (Math.random() - 0.5) * 200;
        if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
-       this.enemies.push(new Enemy(x, 45, z));
+       this.enemies.push(new Enemy(x, 2, z));
     }
 
     if (typeof window !== 'undefined') {
