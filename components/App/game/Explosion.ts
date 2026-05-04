@@ -38,7 +38,7 @@ export class Explosion {
         if (type === 'grenade') {
             // Cinematic grenade explosion
             const numFire = 45 * scaleMultiplier;
-            const numSmoke = 65 * scaleMultiplier;
+            const numSmoke = 20 * scaleMultiplier;
             const numDebris = 25 * scaleMultiplier;
             
             // 1. Initial blinding flash
@@ -80,8 +80,8 @@ export class Explosion {
                 const dirZ = Math.cos(phi);
 
                 const vel = UT.VEC3_SCALE([dirX, dirY, dirZ], speed);
-                const life = (1.5 + Math.random() * 1.5);
-                this.particles.push({ pos, vel, life, maxLife: life, colorIdx: 3 + Math.floor(Math.random() * 2), scaleMultiplier: scaleMultiplier * (2.0 + Math.random()*2.5), type: 'smoke' });
+                const life = (0.8 + Math.random() * 0.8);
+                this.particles.push({ pos, vel, life, maxLife: life, colorIdx: 3 + Math.floor(Math.random() * 2), scaleMultiplier: scaleMultiplier * (0.7 + Math.random() * 0.8), type: 'smoke' });
             }
 
             // 4. Heavy debris chunks (fly up and fall)
