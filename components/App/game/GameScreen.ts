@@ -186,7 +186,7 @@ export class GameScreen extends Screen {
             const dy = pPos.GetY() - ePos.GetY();
             const dz = pPos.GetZ() - ePos.GetZ();
             const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-            if (dist < 3.5) {
+            if (dist < 2.2) {
                 hitEnemy = true;
                 if (p.type === 'grenade') {
                     enemy.hp -= 100; // instant kill
@@ -221,8 +221,8 @@ export class GameScreen extends Screen {
         const deltaVelSq = dvX*dvX + dvY*dvY + dvZ*dvZ;
         
         // A normal bullet is fast (>100). Gravity only changes Y vel a tiny bit per frame.
-        // If deltaVelSq > 1000, it hit a physical obstacle.
-        const isImpact = pPos.GetY() < 0.2 || deltaVelSq > 1000; 
+        // If deltaVelSq > 100, it hit a physical obstacle.
+        const isImpact = pPos.GetY() < 0.2 || deltaVelSq > 100; 
 
         if (isImpact) {
             p.life = 0;
@@ -266,6 +266,12 @@ export class GameScreen extends Screen {
             const dz = pPos.GetZ() - pTarget[2];
             const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
             
+            const curV = p.body.body.GetLinearVelocity();
+            const dvX = curV.GetX() - p.lastVel[0];
+            const dvY = curV.GetY() - p.lastVel[1];
+            const dvZ = curV.GetZ() - p.lastVel[2];
+            const deltaVelSq = dvX*dvX + dvY*dvY + dvZ*dvZ;
+            
             if (dist < 2.5) {
                 p.life = 0;
                 this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ()));
@@ -276,7 +282,7 @@ export class GameScreen extends Screen {
                 gfx3JoltManager.bodyInterface.AddImpulse(this.tank.physicsBody.body.GetID(), pushForce);
                 
                 // Add camera shake or player damage logic here
-            } else if (pPos.GetY() < 0.2) {
+            } else if (pPos.GetY() < 0.2 || deltaVelSq > 100) {
                 p.life = 0;
                 this.explosions.push(new Explosion(pPos.GetX(), pPos.GetY(), pPos.GetZ()));
             }
@@ -284,7 +290,7 @@ export class GameScreen extends Screen {
     }
 
     // Update based on possessed entity
-    const didShoot = this.tank.update(ts, combinedMoveDir, isFiring, this.cameraYaw);
+    const didShoot = this.tank.update(ts, combinedMoveDir, isFiring, this.cameraYaw, this.cameraPitch);
     if (didShoot) {
        const bPos = this.tank.barrel.getPosition();
        const bRot = this.tank.barrel.getQuaternion();

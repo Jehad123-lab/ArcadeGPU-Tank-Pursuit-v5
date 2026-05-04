@@ -61,7 +61,7 @@ export class Enemy {
   hp: number = 100;
   currentUp: vec3 = [0, 1, 0];
   
-  projectiles: { body: any, life: number, rot: Quaternion }[] = [];
+  projectiles: { body: any, life: number, rot: Quaternion, lastVel: [number, number, number] }[] = [];
 
   constructor(x: number, y: number, z: number) {
     // Note: initMeshes should be called externally to wait for async loading
@@ -88,6 +88,9 @@ export class Enemy {
        if (p.life <= 0) {
           gfx3JoltManager.remove(p.body.bodyId);
           this.projectiles.splice(i, 1);
+       } else {
+          const curV = p.body.body.GetLinearVelocity();
+          p.lastVel = [curV.GetX(), curV.GetY(), curV.GetZ()];
        }
     }
 
@@ -198,7 +201,11 @@ export class Enemy {
       x: startPos[0], y: startPos[1], z: startPos[2],
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mMassPropertiesOverride: 0.01, mRestitution: 0.4 }
+      settings: { 
+          mMassPropertiesOverride: 0.01, 
+          mRestitution: 0.0,
+          mMotionQuality: Gfx3Jolt.EMotionQuality_LinearCast
+      }
     });
     
     // Add arced motion similar to artillery/grenades
@@ -214,7 +221,7 @@ export class Enemy {
     const recoilForce = new Gfx3Jolt.Vec3(-direction[0] * 500, -direction[1] * 500, -direction[2] * 500);
     gfx3JoltManager.bodyInterface.AddImpulse(this.physicsBody.body.GetID(), recoilForce);
     
-    this.projectiles.push({ body: pBody, life: 3.0, rot: q });
+    this.projectiles.push({ body: pBody, life: 3.0, rot: q, lastVel: [pVel.GetX(), pVel.GetY(), pVel.GetZ()] });
     
     return {
        muzzlePos: [startPos[0], startPos[1], startPos[2]] as vec3,

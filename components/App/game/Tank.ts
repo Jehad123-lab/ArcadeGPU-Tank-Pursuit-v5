@@ -61,7 +61,7 @@ export class Tank {
 
     this.physicsBody = gfx3JoltManager.addBox({
       width: 3.45, height: 0.9, depth: 3.6,
-      x: 0, y: 2, z: 0,
+      x: 0, y: 0.5, z: 0,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
       settings: { mAngularDamping: 1.0, mLinearDamping: 0.5, mMassPropertiesOverride: 100.0, mAllowedDOFs: 7 }
@@ -94,7 +94,7 @@ export class Tank {
   /**
    * Updates physics and syncs mesh transforms.
    */
-  update(ts: number, moveDir: { x: number, y: number }, fireType: 'none' | 'normal' | 'grenade' = 'none', cameraYaw: number = 0): false | 'normal' | 'grenade' {
+  update(ts: number, moveDir: { x: number, y: number }, fireType: 'none' | 'normal' | 'grenade' = 'none', cameraYaw: number = 0, cameraPitch: number = 0): false | 'normal' | 'grenade' {
     const speed = 15;
     const rotSpeed = 3.5;
 
@@ -235,15 +235,20 @@ export class Tank {
     const localYawQ = Quaternion.createFromEuler(localYaw, 0, 0, 'YXZ');
     const turretQ = Quaternion.multiply(q, localYawQ);
     
+    // Apply pitch exclusively to the barrel/turret gun
+    // Note: To pitch up, we rotate around X axis.
+    const pitchQ = Quaternion.createFromEuler(0, cameraPitch, 0, 'YXZ'); // pitch is X axis rotation
+    const barrelQ = Quaternion.multiply(turretQ, pitchQ);
+
     const turretOffset = q.rotateVector([0, 0.675, 0]);
     this.turret.setPosition(pos.GetX() + turretOffset[0], pos.GetY() + turretOffset[1], pos.GetZ() + turretOffset[2]);
     this.turret.setQuaternion(turretQ);
 
     const visualRecoil = this.recoil > 0 ? this.recoil * 0.45 : 0;
-    const barrelRelativePos = turretQ.rotateVector([0, 0, -1.2 + visualRecoil]);
+    const barrelRelativePos = barrelQ.rotateVector([0, 0, -1.2 + visualRecoil]);
     const turretPos = this.turret.getPosition();
     this.barrel.setPosition(turretPos[0] + barrelRelativePos[0], turretPos[1] + barrelRelativePos[1], turretPos[2] + barrelRelativePos[2]);
-    this.barrel.setQuaternion(turretQ);
+    this.barrel.setQuaternion(barrelQ);
     
     const hatchOffset = turretQ.rotateVector([0, 0.375 + 0.075, 0.3]);
     this.hatch.setPosition(turretPos[0] + hatchOffset[0], turretPos[1] + hatchOffset[1], turretPos[2] + hatchOffset[2]);
@@ -309,7 +314,11 @@ export class Tank {
       x: startPos[0], y: startPos[1], z: startPos[2],
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mMassPropertiesOverride: 0.01, mRestitution: 0.0 } // Set restitution to 0 to minimize bounce
+      settings: { 
+          mMassPropertiesOverride: 0.01, 
+          mRestitution: 0.0,
+          mMotionQuality: Gfx3Jolt.EMotionQuality_LinearCast 
+      }
     });
     
     let forwardSpeed = 150; // Increased normally bullet speed
